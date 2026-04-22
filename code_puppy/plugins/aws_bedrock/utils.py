@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from typing import Any
 
 from .config import (
@@ -14,17 +13,6 @@ from .config import (
 
 logger = logging.getLogger(__name__)
 
-
-def resolve_env_var(value: str) -> str:
-    """Resolve a value that may be an environment variable reference ($VAR)."""
-    if value and value.startswith("$"):
-        env_var = value[1:]
-        resolved = os.environ.get(env_var)
-        if resolved is None:
-            logger.warning("Environment variable '%s' not set", env_var)
-            return ""
-        return resolved
-    return value
 
 
 def load_extra_models() -> dict[str, Any]:
@@ -152,6 +140,7 @@ def remove_bedrock_models_from_config() -> list[str]:
         del models[key]
 
     if removed and not save_extra_models(models):
+        logger.error("Failed to save extra_models.json after removing Bedrock models")
         return []
 
     return removed

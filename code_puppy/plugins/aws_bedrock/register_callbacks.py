@@ -80,25 +80,22 @@ def _handle_bedrock_setup() -> None:
     (IAM role, env vars, ~/.aws/config). No prompts needed.
     """
 
-    def _print(msg: str = "") -> None:
-        print(msg, flush=True)
-
     added_models = add_bedrock_models_to_config(
         aws_region=get_bedrock_region(),
         aws_profile=get_aws_profile(),
     )
 
     if added_models:
-        _print(f"Bedrock: added {len(added_models)} model(s):")
+        emit_success(f"Bedrock: added {len(added_models)} model(s):")
         for model_key in added_models:
-            _print(f"   - {model_key}")
+            emit_info(f"   - {model_key}")
 
         from code_puppy.model_switching import set_model_and_reload_agent
 
-        set_model_and_reload_agent("bedrock-claude-opus-4-7")
-        _print("Switched to bedrock-claude-opus-4-7.")
+        set_model_and_reload_agent("bedrock-opus-4-7")
+        emit_info("Switched to bedrock-opus-4-7.")
     else:
-        _print("Bedrock: no models added — check configuration.")
+        emit_warning("Bedrock: no models added — check configuration.")
 
 
 def _handle_bedrock_remove() -> None:
@@ -121,7 +118,7 @@ def _custom_help() -> list[tuple[str, str]]:
     """Return help entries for custom commands."""
     return [
         ("bedrock-status", "Check AWS Bedrock authentication and configuration"),
-        ("bedrock-setup", "Interactive wizard to configure Bedrock models"),
+        ("bedrock-setup", "Auto-configure Bedrock Claude models"),
         ("bedrock-remove", "Remove all Bedrock model configurations"),
     ]
 
@@ -144,7 +141,7 @@ def _handle_custom_command(command: str, name: str) -> bool | None:
     except Exception as e:
         logger.exception("Error handling /%s command: %s", name, e)
         emit_error(f"Command /{name} failed: {e}")
-        return False
+        return True
 
 
 # ============================================================================
