@@ -14,7 +14,6 @@ from .config import (
 logger = logging.getLogger(__name__)
 
 
-
 def load_extra_models() -> dict[str, Any]:
     """Load the extra_models.json configuration file."""
     extra_models_path = get_extra_models_path()

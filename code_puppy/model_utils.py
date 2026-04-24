@@ -92,7 +92,9 @@ def prepare_prompt_for_model(
     )
 
 
-def supports_adaptive_thinking(model_name: str, actual_model_id: str | None = None) -> bool:
+def supports_adaptive_thinking(
+    model_name: str, actual_model_id: str | None = None
+) -> bool:
     """Return whether a model should default to adaptive thinking.
 
     Opus 4-6, Opus 4-7, and Sonnet 4-6 models support adaptive thinking.
@@ -109,14 +111,19 @@ def supports_adaptive_thinking(model_name: str, actual_model_id: str | None = No
         candidates.append(actual_model_id.lower())
 
     _ADAPTIVE_TAGS = (
-        "opus-4-6", "4-6-opus",
-        "opus-4-7", "4-7-opus",
-        "sonnet-4-6", "4-6-sonnet",
+        "opus-4-6",
+        "4-6-opus",
+        "opus-4-7",
+        "4-7-opus",
+        "sonnet-4-6",
+        "4-6-sonnet",
     )
     return any(tag in c for c in candidates for tag in _ADAPTIVE_TAGS)
 
 
-def get_default_extended_thinking(model_name: str, actual_model_id: str | None = None) -> str:
+def get_default_extended_thinking(
+    model_name: str, actual_model_id: str | None = None
+) -> str:
     """Return the default extended_thinking mode for an Anthropic model.
 
     Opus 4-6, Opus 4-7, and Sonnet 4-6 models default to ``"adaptive"``
@@ -135,7 +142,9 @@ def get_default_extended_thinking(model_name: str, actual_model_id: str | None =
     return "enabled"
 
 
-def should_use_anthropic_thinking_summary(model_name: str, actual_model_id: str | None = None) -> bool:
+def should_use_anthropic_thinking_summary(
+    model_name: str, actual_model_id: str | None = None
+) -> bool:
     """Return whether Anthropic adaptive thinking should request summary display.
 
     Anthropic's newer Opus 4.7 models require ``display: \"summarized\"`` alongside

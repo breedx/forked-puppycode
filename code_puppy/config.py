@@ -531,6 +531,7 @@ def model_supports_setting(model_name: str, setting: str) -> bool:
             if model_name.startswith("claude-") or model_name.startswith("anthropic-"):
                 base = ["temperature", "extended_thinking", "budget_tokens"]
                 from code_puppy.model_utils import supports_adaptive_thinking
+
                 if supports_adaptive_thinking(model_name):
                     base.append("effort")
                 return setting in base
@@ -666,7 +667,7 @@ def get_openai_reasoning_summary() -> str:
     - detailed: fuller reasoning summaries
     """
     allowed_values = {"auto", "concise", "detailed"}
-    configured = (get_value("openai_reasoning_summary") or "auto").strip().lower()
+    configured = (get_value("openai_reasoning_summary") or "detailed").strip().lower()
     if configured not in allowed_values:
         return "auto"
     return configured

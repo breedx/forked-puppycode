@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import os
 from pathlib import Path
 
@@ -14,8 +15,14 @@ ENV_BEDROCK_REGION = "BEDROCK_REGION"
 DEFAULT_REGION = "us-east-1"
 
 
+@functools.lru_cache(maxsize=1)
 def _detect_region() -> str | None:
-    """Detect region from boto3 session or EC2 instance metadata."""
+    """Detect region from boto3 session or EC2 instance metadata.
+
+    Result is cached for the process lifetime: on non-EC2 hosts with no
+    AWS config, the IMDS path below incurs two 1-second timeouts, and
+    this function is called on every model instantiation.
+    """
     try:
         import boto3
 
@@ -41,6 +48,7 @@ def _detect_region() -> str | None:
         return urllib.request.urlopen(region_req, timeout=1).read().decode()
     except Exception:
         return None
+
 
 MODELS: list[dict] = [
     {

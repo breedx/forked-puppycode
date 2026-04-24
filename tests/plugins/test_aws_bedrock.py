@@ -90,9 +90,10 @@ class TestConfig:
         from code_puppy.plugins.aws_bedrock.config import get_bedrock_region
 
         env = {"AWS_REGION": "us-west-2"}
-        with patch.dict(
-            "os.environ", env, clear=False
-        ), patch.dict("os.environ", {"BEDROCK_REGION": ""}, clear=False):
+        with (
+            patch.dict("os.environ", env, clear=False),
+            patch.dict("os.environ", {"BEDROCK_REGION": ""}, clear=False),
+        ):
             # Remove BEDROCK_REGION so it falls through
             import os
 
@@ -102,12 +103,16 @@ class TestConfig:
     def test_get_bedrock_region_default(self):
         from code_puppy.plugins.aws_bedrock.config import get_bedrock_region
 
-        with patch.dict(
-            "os.environ",
-            {"BEDROCK_REGION": "", "AWS_REGION": ""},
-            clear=False,
-        ), patch(
-            "code_puppy.plugins.aws_bedrock.config._detect_region", return_value=None
+        with (
+            patch.dict(
+                "os.environ",
+                {"BEDROCK_REGION": "", "AWS_REGION": ""},
+                clear=False,
+            ),
+            patch(
+                "code_puppy.plugins.aws_bedrock.config._detect_region",
+                return_value=None,
+            ),
         ):
             import os
 

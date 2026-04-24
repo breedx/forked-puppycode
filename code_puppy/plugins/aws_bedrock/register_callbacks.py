@@ -149,9 +149,7 @@ def _handle_custom_command(command: str, name: str) -> bool | None:
 # ============================================================================
 
 
-def _create_aws_bedrock_model(
-    model_name: str, model_config: dict, config: dict
-) -> Any:
+def _create_aws_bedrock_model(model_name: str, model_config: dict, config: dict) -> Any:
     """Create an AWS Bedrock model instance.
 
     Uses AsyncAnthropicBedrock from the anthropic SDK with standard
@@ -162,8 +160,7 @@ def _create_aws_bedrock_model(
         from pydantic_ai.models.anthropic import AnthropicModel
     except ImportError as e:
         emit_error(
-            f"Failed to create Bedrock model '{model_name}': "
-            f"Missing dependency - {e}"
+            f"Failed to create Bedrock model '{model_name}': Missing dependency - {e}"
         )
         return None
 
