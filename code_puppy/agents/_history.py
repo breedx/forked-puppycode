@@ -282,6 +282,9 @@ def filter_huge_messages(
 _ANTHROPIC_TOOL_ID_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 # Character-level replacement: swap any character NOT in the allowed set.
 _BAD_TOOL_ID_CHAR_RE = re.compile(r"[^a-zA-Z0-9_-]")
+# LiteLLM smuggles Vertex/Gemini thoughtSignature blobs as
+# `<id>__thought__<base64-payload>` at the end of tool_call_id.
+_LITELLM_THOUGHT_RE = re.compile(r"__thought__[A-Za-z0-9+/=]+$")
 
 
 def sanitize_tool_call_ids(
@@ -315,11 +318,13 @@ def sanitize_tool_call_ids(
             # secondary issue. The collision guard is not needed here anyway:
             # Gemini's ids are globally unique by construction (the signature
             # is derived from the call content), so two different ids will
-            # never sanitize to the same base string. `__thought__` is the
-            # signal that this id is an opaque blob that must not be touched.
-            # This guard runs for all models but only activates for Gemini in
-            # practice: no other provider puts `__thought__` in tool_call_id.
-            if tcid and "__thought__" in tcid:
+            # never sanitize to the same base string. _LITELLM_THOUGHT_RE
+            # matches the exact `__thought__<base64>` suffix so only genuine
+            # carrier ids are exempted — not arbitrary ids that happen to
+            # contain the substring. This guard runs for all models but only
+            # activates for Gemini in practice: no other provider produces
+            # this pattern.
+            if tcid and _LITELLM_THOUGHT_RE.search(tcid):
                 continue
             if tcid and not _ANTHROPIC_TOOL_ID_RE.match(tcid):
                 if tcid not in bad_ids:
