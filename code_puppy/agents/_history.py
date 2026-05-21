@@ -307,6 +307,13 @@ def sanitize_tool_call_ids(
     for msg in messages:
         for part in getattr(msg, "parts", []) or []:
             tcid = getattr(part, "tool_call_id", None)
+            # LiteLLM smuggles Vertex/Gemini thoughtSignature blobs through
+            # tool_call_id using the marker `__thought__`. The payload is
+            # standard base64 (+/), which trips our regex. Rewriting it
+            # destroys the signature and every subsequent Gemini tool
+            # follow-up 400s with "Corrupted thought signature."
+            if tcid and "__thought__" in tcid:
+                continue
             if tcid and not _ANTHROPIC_TOOL_ID_RE.match(tcid):
                 if tcid not in bad_ids:
                     # Replace non-matching chars with '_' and append a short
