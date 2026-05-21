@@ -310,11 +310,12 @@ def sanitize_tool_call_ids(
             # LiteLLM encodes Vertex/Gemini thoughtSignature blobs into
             # tool_call_id as `<id>__thought__<base64-sig>`. Standard base64
             # uses `+` and `/`, which trip our Anthropic-specific regex below.
-            # This sanitizer applies that regex unconditionally, so it corrupts
-            # the signature on every Gemini turn. The bug is here, not in
-            # LiteLLM — the OpenAI spec doesn't restrict tool_call_id chars;
-            # Anthropic's pattern is provider-specific. Skip these ids so the
-            # signature round-trips intact.
+            # This sanitizer applies that regex unconditionally to all
+            # providers, so it corrupts the signature on every Gemini turn.
+            # The bug is here — the OpenAI spec doesn't restrict tool_call_id
+            # chars; Anthropic's pattern is provider-specific.
+            # This guard runs for all models but only activates for Gemini in
+            # practice: no other provider puts `__thought__` in tool_call_id.
             if tcid and "__thought__" in tcid:
                 continue
             if tcid and not _ANTHROPIC_TOOL_ID_RE.match(tcid):
