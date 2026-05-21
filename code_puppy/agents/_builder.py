@@ -76,7 +76,7 @@ def _expand_at_references(text: str, base_dir: Path) -> str:
     def _replacer(match: re.Match) -> str:
         ref_path = _resolve_at_ref(base_dir, match.group(1))
         if ref_path and ref_path.is_file():
-            return ref_path.read_text(encoding="utf-8-sig").rstrip("\n") + "\n\n"
+            return ref_path.read_text(encoding="utf-8-sig").rstrip("\n")
         return match.group(0)  # leave unresolvable/unsafe refs intact
 
     return _AT_REF_RE.sub(_replacer, text)
