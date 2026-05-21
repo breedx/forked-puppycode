@@ -5,6 +5,7 @@ Code Puppy prompt without any agent processing.
 """
 
 import asyncio
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from code_puppy.command_line.shell_passthrough import (
@@ -145,9 +146,11 @@ class TestExecuteShellPassthrough:
         execute_shell_passthrough("!echo hello")
 
         mock_run.assert_called_once()
-        call_kwargs = mock_run.call_args
-        assert call_kwargs[1]["shell"] is True
-        assert call_kwargs[0][0] == "echo hello"
+        call_args = mock_run.call_args
+        # Called with [shell, "-c", command] — no shell=True
+        assert call_args[0][0][0] in ("/bin/bash", "/bin/sh", "bash", "sh") or call_args[0][0][0] == os.environ.get("SHELL", "bash")
+        assert call_args[0][0][1] == "-c"
+        assert call_args[0][0][2] == "echo hello"
 
         # Should have printed banner, context line, and success
         assert console.print.call_count == 3
@@ -286,7 +289,7 @@ class TestExecuteShellPassthrough:
 
         execute_shell_passthrough("!echo [bold red]oops[/bold red]")
 
-        assert mock_run.call_args[0][0] == "echo [bold red]oops[/bold red]"
+        assert mock_run.call_args[0][0][2] == "echo [bold red]oops[/bold red]"
 
     @patch("code_puppy.command_line.shell_passthrough.subprocess.run")
     @patch("code_puppy.command_line.shell_passthrough._get_console")
@@ -361,7 +364,7 @@ class TestInitialCommandPassthrough:
 
             # Shell command should have been executed via subprocess
             mock_run.assert_called_once()
-            assert mock_run.call_args[0][0] == "ls -la"
+            assert mock_run.call_args[0][0][2] == "ls -la"
             # Agent processing must NOT have been triggered
             mock_run_prompt.assert_not_called()
 
@@ -386,7 +389,7 @@ class TestInitialCommandPassthrough:
 
             # Shell command should have been executed
             mock_run.assert_called_once()
-            assert mock_run.call_args[0][0] == "ls -la"
+            assert mock_run.call_args[0][0][2] == "ls -la"
             # Agent should NOT have been called
             mock_agent.assert_not_called()
             mock_run_prompt.assert_not_called()

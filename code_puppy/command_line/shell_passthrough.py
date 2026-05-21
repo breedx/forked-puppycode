@@ -112,10 +112,13 @@ def execute_shell_passthrough(task: str) -> None:
 
     start_time = time.monotonic()
 
+    # Use $SHELL when available so bash-specific syntax works in crates
+    # (which run dash as /bin/sh). Fall back to bash, then sh.
+    shell_bin = os.environ.get("SHELL") or "bash"
+
     try:
         result = subprocess.run(
-            command,
-            shell=True,
+            [shell_bin, "-c", command],
             cwd=os.getcwd(),
             # Inherit stdio — output goes straight to the terminal
             stdin=sys.stdin,
