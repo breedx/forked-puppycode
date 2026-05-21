@@ -309,13 +309,16 @@ def sanitize_tool_call_ids(
             tcid = getattr(part, "tool_call_id", None)
             # LiteLLM encodes Vertex/Gemini thoughtSignature blobs into
             # tool_call_id as `<id>__thought__<base64-sig>`. Gemini requires
-            # this value to round-trip byte-for-byte; any modification —
-            # char replacement or appending the collision-guard suffix below —
-            # corrupts the signature and causes a 400 on the next tool turn.
-            # `__thought__` is the signal that this id is an opaque blob and
-            # must not be touched. This guard runs for all models but only
-            # activates for Gemini in practice: no other provider puts
-            # `__thought__` in tool_call_id.
+            # this value to round-trip byte-for-byte. The collision-guard
+            # suffix added below (`_<6digit>`) alone is enough to corrupt the
+            # signature and 400 on the next tool turn — char replacement is a
+            # secondary issue. The collision guard is not needed here anyway:
+            # Gemini's ids are globally unique by construction (the signature
+            # is derived from the call content), so two different ids will
+            # never sanitize to the same base string. `__thought__` is the
+            # signal that this id is an opaque blob that must not be touched.
+            # This guard runs for all models but only activates for Gemini in
+            # practice: no other provider puts `__thought__` in tool_call_id.
             if tcid and "__thought__" in tcid:
                 continue
             if tcid and not _ANTHROPIC_TOOL_ID_RE.match(tcid):
