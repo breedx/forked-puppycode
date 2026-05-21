@@ -310,20 +310,22 @@ def sanitize_tool_call_ids(
     for msg in messages:
         for part in getattr(msg, "parts", []) or []:
             tcid = getattr(part, "tool_call_id", None)
-            # LiteLLM encodes Vertex/Gemini thoughtSignature blobs into
-            # tool_call_id as `<id>__thought__<base64-sig>`. Gemini requires
-            # this value to round-trip byte-for-byte. The collision-guard
+            # Gemini's native API carries thoughtSignature as a separate field
+            # on FunctionCall — not in the ID. LiteLLM has no place to put it
+            # in the OpenAI-compat schema, so it smuggles it into tool_call_id
+            # as `<id>__thought__<base64-sig>`. This is LiteLLM's encoding,
+            # not native Gemini behavior; calling Vertex directly would never
+            # produce it. Gemini requires the full encoded value to round-trip
+            # byte-for-byte through LiteLLM. Stripping it at the kibble layer
+            # would require a stateful clean_id→full_id cache per session just
+            # to work around this sanitizer — wrong layer. The collision-guard
             # suffix added below (`_<6digit>`) alone is enough to corrupt the
-            # signature and 400 on the next tool turn — char replacement is a
+            # signature and 400 on the next tool turn; char replacement is a
             # secondary issue. The collision guard is not needed here anyway:
-            # Gemini's ids are globally unique by construction (the signature
-            # is derived from the call content), so two different ids will
-            # never sanitize to the same base string. _LITELLM_THOUGHT_RE
-            # matches the exact `__thought__<base64>` suffix so only genuine
-            # carrier ids are exempted — not arbitrary ids that happen to
-            # contain the substring. This guard runs for all models but only
-            # activates for Gemini in practice: no other provider produces
-            # this pattern.
+            # Gemini's ids are unique by construction (the signature is derived
+            # from the call content). _LITELLM_THOUGHT_RE matches the exact
+            # `__thought__<base64>` suffix so only genuine carrier ids are
+            # exempted — not arbitrary ids that happen to contain the substring.
             if tcid and _LITELLM_THOUGHT_RE.search(tcid):
                 continue
             if tcid and not _ANTHROPIC_TOOL_ID_RE.match(tcid):
