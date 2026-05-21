@@ -209,7 +209,7 @@ class TestExpandAtReferences:
         included.write_text("# Included content")
 
         result = _expand_at_references("@rules.md", base_dir=tmp_path)
-        assert result == "# Included content"
+        assert result == "# Included content\n\n"
 
     def test_expands_at_reference_in_context(self, tmp_path):
         """@ref surrounded by other text replaces only the @ref line."""
@@ -220,7 +220,7 @@ class TestExpandAtReferences:
 
         text = "before\n@extra.md\nafter"
         result = _expand_at_references(text, base_dir=tmp_path)
-        assert result == "before\nextra stuff\nafter"
+        assert result == "before\nextra stuff\n\nafter"
 
     def test_missing_at_reference_left_intact(self, tmp_path):
         """Unknown @ref is left as-is so the agent can see it failed."""
@@ -240,7 +240,7 @@ class TestExpandAtReferences:
 
         result = _expand_at_references("@included.md", base_dir=tmp_path)
         # Should contain the literal text of included.md, NOT expand @nested.md
-        assert result == "@nested.md"
+        assert result == "@nested.md\n\n"
 
     def test_at_ref_with_subdirectory_path(self, tmp_path):
         """@subdir/file.md resolves relative to base_dir."""
@@ -251,7 +251,7 @@ class TestExpandAtReferences:
         (subdir / "dev.md").write_text("# dev rules")
 
         result = _expand_at_references("@rules/dev.md", base_dir=tmp_path)
-        assert result == "# dev rules"
+        assert result == "# dev rules\n\n"
 
     def test_at_ref_not_expanded_mid_line(self, tmp_path):
         """@ref mid-line (not at line start) is NOT expanded."""
@@ -271,7 +271,7 @@ class TestExpandAtReferences:
         (tmp_path / "b.md").write_text("# B")
 
         result = _expand_at_references("@a.md\n@b.md", base_dir=tmp_path)
-        assert result == "# A\n# B"
+        assert result == "# A\n\n# B\n\n"
 
 
 class TestResolveAtRef:
@@ -406,7 +406,7 @@ class TestClaudeMdFallback:
         with patch("code_puppy.agents._builder.CONFIG_DIR", str(mock_config_dir)):
             result = load_puppy_rules()
 
-        assert result == "# Dev rules"
+        assert result == "# Dev rules\n\n"
 
     def test_no_rules_anywhere_returns_none(self, temp_project, mock_config_dir):
         """Returns None when neither AGENTS.md nor CLAUDE.md exist."""
