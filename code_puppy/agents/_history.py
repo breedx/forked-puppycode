@@ -310,20 +310,14 @@ def sanitize_tool_call_ids(
     for msg in messages:
         for part in getattr(msg, "parts", []) or []:
             tcid = getattr(part, "tool_call_id", None)
-            # Gemini's native API carries thoughtSignature as a separate field
-            # on FunctionCall — not in the ID. LiteLLM has no place to put it
-            # in the OpenAI-compat schema, so it smuggles it into tool_call_id
-            # as `<id>__thought__<base64-sig>`. This is LiteLLM's encoding,
-            # not native Gemini behavior; calling Vertex directly would never
-            # produce it. Gemini requires the full encoded value to round-trip
-            # byte-for-byte through LiteLLM. The collision-guard suffix added
-            # below (`_<6digit>`) alone is enough to corrupt the signature and
-            # 400 on the next tool turn; char replacement is a secondary issue.
-            # The collision guard is not needed here anyway: Gemini's ids are
-            # unique by construction (the signature is derived from the call
-            # content). _LITELLM_THOUGHT_RE matches the exact
-            # `__thought__<base64>` suffix so only genuine carrier ids are
-            # exempted — not arbitrary ids that happen to contain the substring.
+            # Gemini's native API puts thoughtSignature on FunctionCall as a
+            # separate field. The OpenAI-compat schema has no such field, so
+            # LiteLLM smuggles it into tool_call_id: `<id>__thought__<base64>`.
+            # Gemini requires this to round-trip intact — even the `_<6digit>`
+            # collision-guard suffix below corrupts it and causes a 400 on the
+            # next tool turn. The collision guard isn't needed here anyway: the
+            # embedded signature makes each id globally unique. _LITELLM_THOUGHT_RE
+            # matches the exact suffix so only genuine carrier ids are exempted.
             if tcid and _LITELLM_THOUGHT_RE.search(tcid):
                 continue
             if tcid and not _ANTHROPIC_TOOL_ID_RE.match(tcid):
