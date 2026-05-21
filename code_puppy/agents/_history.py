@@ -316,14 +316,12 @@ def sanitize_tool_call_ids(
             # as `<id>__thought__<base64-sig>`. This is LiteLLM's encoding,
             # not native Gemini behavior; calling Vertex directly would never
             # produce it. Gemini requires the full encoded value to round-trip
-            # byte-for-byte through LiteLLM. Stripping it at the kibble layer
-            # would require a stateful clean_id→full_id cache per session just
-            # to work around this sanitizer — wrong layer. The collision-guard
-            # suffix added below (`_<6digit>`) alone is enough to corrupt the
-            # signature and 400 on the next tool turn; char replacement is a
-            # secondary issue. The collision guard is not needed here anyway:
-            # Gemini's ids are unique by construction (the signature is derived
-            # from the call content). _LITELLM_THOUGHT_RE matches the exact
+            # byte-for-byte through LiteLLM. The collision-guard suffix added
+            # below (`_<6digit>`) alone is enough to corrupt the signature and
+            # 400 on the next tool turn; char replacement is a secondary issue.
+            # The collision guard is not needed here anyway: Gemini's ids are
+            # unique by construction (the signature is derived from the call
+            # content). _LITELLM_THOUGHT_RE matches the exact
             # `__thought__<base64>` suffix so only genuine carrier ids are
             # exempted — not arbitrary ids that happen to contain the substring.
             if tcid and _LITELLM_THOUGHT_RE.search(tcid):
