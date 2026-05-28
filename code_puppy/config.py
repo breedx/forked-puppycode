@@ -130,6 +130,30 @@ def set_universal_constructor_enabled(enabled: bool) -> None:
     set_value("enable_universal_constructor", "true" if enabled else "false")
 
 
+def get_mcp_unbound_warning_silenced() -> bool:
+    """Return True if the 'MCP server registered but not bound' warning is silenced.
+
+    When True, ``code_puppy.mcp_.manager._warn_unbound_servers`` skips emitting
+    its consolidated warning. Default False — the warning exists for a reason
+    (it surfaces hand-edits to ``mcp_servers.json`` that didn't get bound),
+    but power users who *know* about the unbound servers can silence the
+    nag via ``/mcp silence-warning``.
+    """
+    cfg_val = get_value("mcp_unbound_warning_silenced")
+    if cfg_val is None:
+        return False
+    return str(cfg_val).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def set_mcp_unbound_warning_silenced(silenced: bool) -> None:
+    """Silence (or un-silence) the unbound-MCP-server warning.
+
+    Args:
+        silenced: True to silence forever, False to restore the warning.
+    """
+    set_value("mcp_unbound_warning_silenced", "true" if silenced else "false")
+
+
 def get_max_hook_retries() -> int:
     """Return the maximum number of plugin hook retries after an agent run.
 
@@ -1200,8 +1224,8 @@ def get_resume_message_count() -> int:
     val = get_value("resume_message_count")
     try:
         configured_value = int(val) if val else 50
-        # Enforce reasonable bounds: minimum 1, maximum 100
-        return max(1, min(configured_value, 100))
+        # Enforce reasonable bounds: minimum 0 (disabled), maximum 100
+        return max(0, min(configured_value, 100))
     except (ValueError, TypeError):
         return 50
 
@@ -1673,8 +1697,22 @@ def auto_save_session_if_enabled() -> bool:
             auto_saved=True,
         )
 
+        # Append conversation-wide TTFT + TG averages if we have any data.
+        stats_suffix = ""
+        try:
+            from code_puppy.agents.run_stats import AgentRunStats
+
+            avg_ttft, avg_gen = AgentRunStats.get_conversation_stats()
+            formatted = AgentRunStats.format_conversation_stats(avg_ttft, avg_gen)
+            if formatted:
+                stats_suffix = f" | {formatted}"
+        except Exception:
+            # Stats are decorative; never block the auto-save line on them.
+            pass
+
         emit_info(
-            f"🐾 Auto-saved session: {metadata.message_count} messages ({metadata.total_tokens} tokens)"
+            f"🐾 Auto-saved session: {metadata.message_count} messages "
+            f"({metadata.total_tokens} tokens){stats_suffix}"
         )
 
         return True
@@ -1702,8 +1740,76 @@ def get_diff_context_lines() -> int:
         return 6
 
 
+def get_terminal_tty() -> Optional[str]:
+    """Return the TTY device path for stdin, or None if unavailable.
+
+    This identifies the physical terminal so /switch-agent can resume the
+    last autosave session from the same terminal window across restarts.
+    """
+    try:
+        import sys
+
+        return os.ttyname(sys.stdin.fileno())
+    except (OSError, AttributeError, ValueError):
+        return None
+
+
+def _is_valid_autosave_session_name(session_name: str) -> bool:
+    """Return True when a terminal marker names a safe autosave session."""
+    import re
+
+    return bool(re.fullmatch(r"auto_session_\d{8}_\d{6}", session_name))
+
+
+def _tty_session_path(tty: str) -> pathlib.Path:
+    """Return the per-TTY autosave session file path."""
+    tty_key = tty.replace("/", "_").lstrip("_")
+    return pathlib.Path(CACHE_DIR) / "tty_sessions" / f"{tty_key}.txt"
+
+
+def record_terminal_session(session_name: str, *, overwrite: bool = True) -> None:
+    """Persist the current autosave session name for this terminal.
+
+    Uses a dedicated file per TTY so concurrent terminals never clobber each
+    other. Terminal emulators usually assign a fresh TTY per window/tab, and TTY
+    reassignment while Code Puppy is running is rare, but possible after a
+    terminal closes and the OS later reuses the device name. This mapping is
+    therefore best-effort and silently no-ops when no TTY is available or when
+    filesystem writes fail. Set ``overwrite=False`` for startup markers so a
+    previous real session survives until a new session is saved.
+    """
+    tty = get_terminal_tty()
+    if not tty:
+        return
+    try:
+        session_file = _tty_session_path(tty)
+        if session_file.exists() and not overwrite:
+            return
+        session_file.parent.mkdir(parents=True, exist_ok=True)
+        tmp = session_file.with_suffix(".tmp")
+        tmp.write_text(session_name, encoding="utf-8")
+        tmp.replace(session_file)
+    except Exception:
+        pass
+
+
+def get_last_terminal_session() -> Optional[str]:
+    """Return the last autosave session recorded for this terminal."""
+    tty = get_terminal_tty()
+    if not tty:
+        return None
+    try:
+        session_name = _tty_session_path(tty).read_text(encoding="utf-8").strip()
+        if not session_name or not _is_valid_autosave_session_name(session_name):
+            return None
+        return session_name
+    except Exception:
+        return None
+
+
 def finalize_autosave_session() -> str:
     """Persist the current autosave snapshot and rotate to a fresh session."""
+    record_terminal_session(get_current_autosave_session_name())
     auto_save_session_if_enabled()
     return rotate_autosave_id()
 

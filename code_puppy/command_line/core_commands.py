@@ -56,7 +56,7 @@ def handle_cd_command(command: str) -> bool:
     """Change directory or list current directory."""
     import shlex
 
-    from code_puppy.messaging import emit_error, emit_info, emit_success, emit_warning
+    from code_puppy.messaging import emit_error, emit_info, emit_success
 
     try:
         if os.name == "nt":
@@ -90,20 +90,30 @@ def handle_cd_command(command: str) -> bool:
         if os.path.isdir(target):
             os.chdir(target)
             emit_success(f"Changed directory to: {target}")
-            # Reload the agent so the system prompt and project-local
-            # AGENT.md rules reflect the new working directory.  Without
-            # this, the LLM keeps receiving stale path information for the
-            # remainder of the session (the PydanticAgent instructions are
-            # baked in at construction time and never refreshed otherwise).
+            # Refresh the @file fuzzy index for the new cwd. Async/non-blocking;
+            # the prompt stays snappy and the next @completion sees fresh data.
+            try:
+                from code_puppy.command_line import file_index
+
+                file_index.reindex(target, blocking=False)
+            except Exception:
+                # Index is a nicety, not load-bearing. Never block /cd on it.
+                pass
+            # Reload the agent to pick up new working directory context.
+            # This ensures AGENTS.md is re-read and the system prompt is
+            # updated -- without this, the PydanticAgent instructions stay
+            # baked in from construction time and keep serving stale paths
+            # for the remainder of the session.
             try:
                 from code_puppy.agents.agent_manager import get_current_agent
 
+                # reload_code_generation_agent() invalidates cached rules
+                # and rebuilds prompt/context from the new cwd
                 get_current_agent().reload_code_generation_agent()
+                emit_info("Agent context updated for new directory")
             except Exception as e:
-                emit_warning(
-                    f"Directory changed, but agent reload failed: {e}. "
-                    "You may need to run /agent or /model to force a refresh."
-                )
+                # Non-fatal: directory change succeeded even if reload failed
+                emit_error(f"Could not reload agent context: {e}")
         else:
             emit_error(f"Not a directory: {dirname}")
         return True
@@ -238,7 +248,7 @@ def handle_exit_command(command: str) -> bool:
     name="agent",
     description="Switch to a different agent or show available agents",
     usage="/agent <name>, /a <name>",
-    aliases=["a"],
+    aliases=["a", "agents"],
     category="core",
 )
 def handle_agent_command(command: str) -> bool:
@@ -271,6 +281,17 @@ def handle_agent_command(command: str) -> bool:
                     lambda: asyncio.run(interactive_agent_picker())
                 )
                 selected_agent = future.result(timeout=300)  # 5 min timeout
+
+            # Drain any deferred pin-reloads queued from inside the picker.
+            # These MUST run on the main loop, not on the worker's transient
+            # one --- see the comment in agent_menu._PENDING_PIN_RELOADS.
+            from code_puppy.command_line.agent_menu import (
+                apply_pending_pin_reload,
+                consume_pending_pin_reloads,
+            )
+
+            for pin_agent, pin_model in consume_pending_pin_reloads():
+                apply_pending_pin_reload(pin_agent, pin_model)
 
             if selected_agent:
                 current_agent = get_current_agent()

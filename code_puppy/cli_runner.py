@@ -26,7 +26,9 @@ from code_puppy.config import (
     COMMAND_HISTORY_FILE,
     ensure_config_exists,
     finalize_autosave_session,
+    get_current_autosave_session_name,
     initialize_command_history_file,
+    record_terminal_session,
     save_command_to_history,
 )
 from code_puppy.http_utils import find_available_port
@@ -244,14 +246,21 @@ async def main():
         if should_use_alternate_cancel_key():
             from code_puppy.terminal_utils import (
                 disable_windows_ctrl_c,
+                install_windows_ctrl_c_swallower,
                 set_keep_ctrl_c_disabled,
             )
 
-            # Disable Ctrl+C at the console input level
-            # This prevents Ctrl+C from being processed as a signal at all
+            # Layer 1: Strip ENABLE_PROCESSED_INPUT so the console doesn't
+            # translate Ctrl+C into a signal in the first place.
             disable_windows_ctrl_c()
 
-            # Set flag to keep it disabled (prompt_toolkit may re-enable it)
+            # Layer 2: Register an OS-level SetConsoleCtrlHandler that
+            # swallows CTRL_C_EVENT even if something flips processed-input
+            # back on (e.g. prompt_toolkit, a child shell exit, etc).
+            install_windows_ctrl_c_swallower()
+
+            # Set flag to keep console mode clamped (prompt_toolkit may
+            # re-enable processed input on entry/exit).
             set_keep_ctrl_c_disabled(True)
 
             # Use print directly - emit_system_message can get cleared by ANSI codes
@@ -260,7 +269,10 @@ async def main():
                 "(Ctrl+C is disabled to prevent terminal issues)"
             )
 
-            # Also install a SIGINT handler as backup
+            # Layer 3: Python-level SIGINT backup. If a SIGINT somehow
+            # squeezes past layers 1 and 2, this handler resets the terminal
+            # and re-clamps everything before returning. It deliberately
+            # does NOT cancel the agent — Ctrl+K owns that on uvx+Windows.
             import signal
 
             from code_puppy.terminal_utils import reset_windows_terminal_full
@@ -268,8 +280,9 @@ async def main():
             def _uvx_protective_sigint_handler(_sig, _frame):
                 """Protective SIGINT handler for Windows+uvx."""
                 reset_windows_terminal_full()
-                # Re-disable Ctrl+C in case something re-enabled it
+                # Re-arm all the guards in case something dropped them.
                 disable_windows_ctrl_c()
+                install_windows_ctrl_c_swallower()
 
             signal.signal(signal.SIGINT, _uvx_protective_sigint_handler)
     except ImportError:
@@ -377,6 +390,12 @@ async def main():
             message_renderer.stop()
         if bus_renderer:
             bus_renderer.stop()
+        # session_end fires BEFORE shutdown so plugins can react to the
+        # session ending while the bus / agent state is still coherent.
+        try:
+            await callbacks.on_session_end()
+        except Exception:
+            pass
         await callbacks.on_shutdown()
 
 
@@ -517,6 +536,9 @@ async def interactive_mode(message_renderer, initial_command: str = None) -> Non
             emit_warning("Falling back to basic input without tab completion")
 
     # Autosave loading is now manual - use /autosave_load command
+
+    # Track this terminal's active session for /switch-agent auto-resume
+    record_terminal_session(get_current_autosave_session_name(), overwrite=False)
 
     # Auto-run tutorial on first startup
     try:

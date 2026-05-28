@@ -17,6 +17,7 @@ PhaseType = Literal[
     "run_shell_command",
     "load_model_config",
     "load_models_config",
+    "load_model_descriptions",
     "load_prompt",
     "agent_reload",
     "custom_command",
@@ -48,6 +49,10 @@ PhaseType = Literal[
     "interactive_turn_end",
     "interactive_turn_cancel",
     "agent_pause_requested",
+    "user_prompt_submit",
+    "pre_compact",
+    "session_end",
+    "notification",
 ]
 CallbackFunc = Callable[..., Any]
 
@@ -65,6 +70,7 @@ _callbacks: Dict[PhaseType, List[CallbackFunc]] = {
     "run_shell_command": [],
     "load_model_config": [],
     "load_models_config": [],
+    "load_model_descriptions": [],
     "load_prompt": [],
     "agent_reload": [],
     "custom_command": [],
@@ -96,6 +102,10 @@ _callbacks: Dict[PhaseType, List[CallbackFunc]] = {
     "interactive_turn_end": [],
     "interactive_turn_cancel": [],
     "agent_pause_requested": [],
+    "user_prompt_submit": [],
+    "pre_compact": [],
+    "session_end": [],
+    "notification": [],
 }
 
 logger = logging.getLogger(__name__)
@@ -257,6 +267,19 @@ def on_load_models_config() -> List[Any]:
         List of model config dicts from all registered callbacks.
     """
     return _trigger_callbacks_sync("load_models_config")
+
+
+def on_load_model_descriptions() -> List[Any]:
+    """Trigger callbacks that provide description-only model overlays.
+
+    Plugins can return dictionaries mapping ``model_name -> description``.
+    These overlays are applied after config merges, so only missing
+    descriptions are injected and model configuration fields are untouched.
+
+    Returns:
+        List of description overlay dicts from all registered callbacks.
+    """
+    return _trigger_callbacks_sync("load_model_descriptions")
 
 
 def on_edit_file(*args, **kwargs) -> Any:
@@ -949,6 +972,63 @@ async def on_interactive_turn_cancel(
         prompt,
         reason=reason,
     )
+
+
+async def on_user_prompt_submit(
+    prompt: str, session_id: str | None = None
+) -> List[Any]:
+    """Fired when a user prompt is about to be submitted to the agent.
+
+    Plugins may inspect the prompt for analytics/logging or return a string
+    to *replace* the prompt (e.g. to inject "additional context" from
+    Claude Code-compatible UserPromptSubmit hooks). The first callback that
+    returns a non-None, non-empty string wins; all others are merged in order
+    via concatenation. Returning None means "don't touch the prompt".
+
+    Args:
+        prompt: The raw user prompt about to be sent.
+        session_id: Optional run/session identifier.
+
+    Returns:
+        List of results from registered callbacks (str | None).
+    """
+    return await _trigger_callbacks("user_prompt_submit", prompt, session_id)
+
+
+async def on_pre_compact(
+    agent_name: str,
+    strategy: str,
+    message_count: int,
+    token_count: int,
+) -> List[Any]:
+    """Fired right before history compaction runs.
+
+    Plugins use this for observation/logging or to short-circuit
+    compaction (currently advisory only — return value is informational).
+    """
+    return await _trigger_callbacks(
+        "pre_compact", agent_name, strategy, message_count, token_count
+    )
+
+
+async def on_session_end() -> List[Any]:
+    """Fired when the interactive session ends (distinct from per-run ``shutdown``).
+
+    For Claude Code-style ``SessionEnd`` semantics. Fires once when the
+    user exits the REPL or the CLI run completes.
+    """
+    return await _trigger_callbacks("session_end")
+
+
+async def on_notification(
+    message: str, level: str = "info", context: Any = None
+) -> List[Any]:
+    """Fired when the app surfaces a notification to the user.
+
+    For Claude Code-style ``Notification`` events (permission prompts,
+    idle waits, etc.). Fire-and-forget; return values are ignored.
+    """
+    return await _trigger_callbacks("notification", message, level, context)
 
 
 async def on_agent_pause_requested() -> List[Any]:
