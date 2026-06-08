@@ -135,9 +135,10 @@ gh pr create -R BuddyTV/lab-code_puppy --base forked-main
 #    in lab-pack.
 ```
 
-The branch is now also PR-ready against upstream — same commit, no
-rebase, no carried VIZIO changes. See "Contributing back to upstream"
-below for the publish step.
+Step 4 stays internal — internal-repo PRs don't expose anything
+publicly. The branch is also PR-ready against upstream when you want
+to send it; see "Contributing back to upstream" below for the publish
+step (it's a separate, opt-in act).
 
 ## Pulling upstream updates
 
@@ -169,6 +170,9 @@ rebuilds the wheel and bumps the pin in `lab-pack/pyproject.toml`. Use
 the make target when shipping a new pack; the manual sequence is for
 when you only want to pick up upstream without cutting a release.
 
+Neither sequence pushes to `breedx` — both stay internal. Mirror
+manually if/when you want to expose the new state publicly.
+
 ## Contributing back to upstream
 
 `BuddyTV/lab-code_puppy` is internal-only — github.com won't accept its
@@ -196,8 +200,8 @@ merges, the change comes back via the standard `git fetch upstream &&
 git merge upstream/main` flow.
 
 Manually-pushed topic branches stay on `breedx` until you delete them
-(`git push breedx --delete <branch>`). The mirror automation only
-manages `main` and `forked-main`; nothing GCs topic branches for you.
+(`git push breedx --delete <branch>`). The mirror button only handles
+`main` and `forked-main`; nothing GCs topic branches for you.
 
 ## The mirror button
 
@@ -221,6 +225,11 @@ the ref from the dropdown.
 Auth is an ed25519 deploy keypair: public half on breedx as a write
 deploy key, private half on BuddyTV as the `BREEDX_DEPLOY_KEY` repo
 secret.
+
+The workflow file gets mirrored to breedx along with the rest of the
+tree, so the workflow technically exists on breedx too. A
+`if: github.repository == 'BuddyTV/lab-code_puppy'` guard at the job
+level makes it skip immediately on breedx — no perms needed there.
 
 The workflow filename is VIZIO-specific so upstream merges never
 conflict on it. Upstream's own workflows (`ci.yml`, `publish.yml`,
