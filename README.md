@@ -1,10 +1,4 @@
-> **🍴 VIZIO's fork of [`mpfaffenberger/code_puppy`](https://github.com/mpfaffenberger/code_puppy).**
-> Source of truth: [`BuddyTV/lab-code_puppy`](https://github.com/BuddyTV/lab-code_puppy)
-> (internal). `main` and `forked-main` are auto-mirrored to the public
-> [`breedx/forked-puppycode`](https://github.com/breedx/forked-puppycode)
-> for upstream PR contributions. Code Puppy itself remains 100% open
-> source under MIT — our fork's improvements flow back upstream via
-> the mirror. Fork-specific dev workflow lives in [`DEVELOPER.md`](DEVELOPER.md).
+> 🍴 VIZIO's fork of [`mpfaffenberger/code_puppy`](https://github.com/mpfaffenberger/code_puppy).
 
 <div align="center">
 
