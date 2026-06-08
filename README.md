@@ -1,4 +1,4 @@
-> 🍴 VIZIO's fork of [`mpfaffenberger/code_puppy`](https://github.com/mpfaffenberger/code_puppy). Our fork's improvements flow back upstream.
+> 🍴 VIZIO's fork of open-source [`mpfaffenberger/code_puppy`](https://github.com/mpfaffenberger/code_puppy). Our fork's improvements flow back upstream.
 
 <div align="center">
 
