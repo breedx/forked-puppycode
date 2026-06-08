@@ -1,9 +1,19 @@
 # Mirror BuddyTV/lab-code_puppy → breedx/forked-puppycode
 #
-# Vizio-only workflow. Pushes `main` and `forked-main` to the public personal
-# fork so they can serve as PR head refs against mpfaffenberger/code_puppy.
+# VIZIO-only workflow. Manually pushes `main` or `forked-main` to the public
+# personal fork so they can serve as PR head refs against
+# mpfaffenberger/code_puppy.
 #
-# This filename is Vizio-specific; upstream will never collide on it. The
+# **MANUAL ONLY.** This workflow does NOT trigger on push. Mirroring to a
+# public repo is a deliberate act — every run is someone consciously
+# saying "I reviewed this ref, no secrets, send it." Run via:
+#
+#   gh workflow run "Mirror to breedx fork" \
+#       -R BuddyTV/lab-code_puppy --ref <main|forked-main>
+#
+# Or click "Run workflow" in the Actions tab of the BuddyTV repo.
+#
+# This filename is VIZIO-specific; upstream will never collide on it. The
 # upstream-owned workflows (ci.yml, publish.yml, pypi-downloads.yml) are
 # disabled via `gh workflow disable` in this repo — the file content stays
 # upstream-identical so `git merge upstream/main` never conflicts.
@@ -16,15 +26,10 @@
 name: Mirror to breedx fork
 
 on:
-  push:
-    branches:
-      - forked-main
-      - main
   workflow_dispatch:
-    # Manual trigger — for re-sync after a push happened before this
-    # workflow existed, or after rotating BREEDX_DEPLOY_KEY. Run with:
-    #   gh workflow run "Mirror to breedx fork" -R BuddyTV/lab-code_puppy --ref <main|forked-main>
-    # The workflow runs on the ref selected and mirrors that ref to breedx.
+    # Manual-only trigger. There is intentionally no `push:` trigger:
+    # auto-mirroring on push made every commit a potential leak window.
+    # Now mirroring requires an explicit human action per ref.
 
 concurrency:
   group: mirror-breedx

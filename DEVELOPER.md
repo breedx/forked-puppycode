@@ -1,12 +1,22 @@
 # lab-code_puppy — Developer Guide (VIZIO fork)
 
-## ⚠️ Treat this repo as public. No secrets, ever.
+## ⚠️ Pushing to the public mirror is a deliberate act.
 
-Every push to `main` or `forked-main` on `BuddyTV/lab-code_puppy`
-auto-mirrors to **`breedx/forked-puppycode`, which is on the public
-internet**. Anything you commit to those two branches is public from
-that moment on — there is no "delete and it goes away," GitHub keeps
-refs reachable by SHA for ~90 days even after you force-push.
+Daily work in `BuddyTV/lab-code_puppy` stays **internal** — pushes to
+any branch (including `main` and `forked-main`) do not leave the
+BuddyTV org automatically.
+
+Going public requires an explicit action: running the
+**"Mirror to breedx fork"** workflow against `main` or `forked-main`.
+That pushes the chosen ref to **`breedx/forked-puppycode`**, which is
+on the public internet. The button is the gate; auto-mirror was
+removed precisely because every push was a potential leak window.
+
+**Before clicking the button, audit the ref. No secrets, ever.**
+
+Once a commit lands on the public mirror it's public for keeps —
+GitHub keeps refs reachable by SHA for ~90 days even after force-push,
+and clones / CDN copies are out of your control immediately.
 
 **Never commit:**
 
@@ -19,27 +29,25 @@ refs reachable by SHA for ~90 days even after you force-push.
 - Customer names, employee names, IP addresses from internal networks
 - Output of internal API calls (responses, logs, traces)
 
-**If you commit a secret, assume it's compromised.** Rotate it
-immediately at the source (regenerate the AWS key, mint a new JWT,
-etc.). Don't try to scrub history first — that takes hours and the
-secret is already in someone's clone or GitHub's CDN.
+**If you commit a secret to a branch that's been mirrored**, assume
+it's compromised. Rotate immediately at the source (regenerate the
+AWS key, mint a new JWT, etc.). Don't try to scrub history first —
+that takes hours and the secret is already gone.
 
-**Topic branches are not mirrored** — they stay internal on BuddyTV
-unless you explicitly `git push breedx <branch>` (see
-"Contributing back to upstream"). Use a topic branch for anything
-sensitive while you sort it out.
+If a secret was committed to a branch that hasn't been mirrored yet,
+you're fine — just rewrite the branch on BuddyTV before mirroring.
 
 ## Repos at a glance
 
-| Repo | Visibility | Role | Auto-mirrored |
+| Repo | Visibility | Role | How content gets there |
 |---|---|---|---|
-| [`BuddyTV/lab-code_puppy`](https://github.com/BuddyTV/lab-code_puppy) | **internal** | Source of truth. Default branch `forked-main`. | n/a — origin |
+| [`BuddyTV/lab-code_puppy`](https://github.com/BuddyTV/lab-code_puppy) | **internal** | Source of truth. Default branch `forked-main`. | Daily work; PRs internal |
 | [`mpfaffenberger/code_puppy`](https://github.com/mpfaffenberger/code_puppy) | **public** | Upstream maintainer's repo. Pull only; never push. | n/a |
-| [`breedx/forked-puppycode`](https://github.com/breedx/forked-puppycode) | **public** | PR-staging surface for upstream contributions. | `main` and `forked-main` (every push) |
+| [`breedx/forked-puppycode`](https://github.com/breedx/forked-puppycode) | **public** | PR-staging surface for upstream contributions. | Manual: button-press for `main`/`forked-main`, `git push breedx <branch>` for topic branches |
 
 `main` is byte-identical to `mpfaffenberger/main` — mirroring it
 exposes nothing new. `forked-main` carries upstream + VIZIO commits —
-that's the surface where leaks happen. Review every commit going in.
+that's the surface where leaks happen. Audit before mirroring.
 
 ## What this file is
 
@@ -167,9 +175,9 @@ when you only want to pick up upstream without cutting a release.
 branches as PR head refs against the public upstream. We use
 `breedx/forked-puppycode` as a public PR-staging surface.
 
-`main` and `forked-main` mirror automatically (see "Mirror automation"
-below). For topic branches you want to send upstream, push them
-manually:
+`main` and `forked-main` are mirrored by **manual button-press**
+(see "The mirror button" below). Topic branches don't go through the
+button at all — push them directly:
 
 ```bash
 # One-time: add breedx as a remote.
@@ -191,13 +199,28 @@ Manually-pushed topic branches stay on `breedx` until you delete them
 (`git push breedx --delete <branch>`). The mirror automation only
 manages `main` and `forked-main`; nothing GCs topic branches for you.
 
-## Mirror automation
+## The mirror button
 
-`.github/workflows/mirror-vizio-fork.yml` runs on every push to `main`
-or `forked-main` on `BuddyTV/lab-code_puppy` and pushes that ref to
-`breedx/forked-puppycode`. Auth is an ed25519 deploy keypair: public
-half on breedx as a write deploy key, private half on BuddyTV as the
-`BREEDX_DEPLOY_KEY` repo secret.
+`.github/workflows/mirror-vizio-fork.yml` is **manual-only**. It
+**does not** trigger on push. Mirroring to a public repo is a
+deliberate act per ref. To run it:
+
+```bash
+# Mirror forked-main as it stands on BuddyTV right now.
+gh workflow run "Mirror to breedx fork" \
+    -R BuddyTV/lab-code_puppy --ref forked-main
+
+# Same for main.
+gh workflow run "Mirror to breedx fork" \
+    -R BuddyTV/lab-code_puppy --ref main
+```
+
+Or click "Run workflow" in the BuddyTV repo's Actions tab and pick
+the ref from the dropdown.
+
+Auth is an ed25519 deploy keypair: public half on breedx as a write
+deploy key, private half on BuddyTV as the `BREEDX_DEPLOY_KEY` repo
+secret.
 
 The workflow filename is VIZIO-specific so upstream merges never
 conflict on it. Upstream's own workflows (`ci.yml`, `publish.yml`,
@@ -217,9 +240,9 @@ gh workflow disable "Mirror to breedx fork" -R BuddyTV/lab-code_puppy
 ```
 
 ⚠️ Disabling the mirror does NOT scrub history that's already public on
-breedx. If something internal leaks through `forked-main`, deal with
-it on breedx itself (delete branch + force-push if you must, but
-remember GitHub keeps refs reachable for ~90 days via direct SHA).
+breedx. If something internal leaked through a previous mirror run,
+deal with it on breedx itself (delete branch + force-push if you must,
+but remember GitHub keeps refs reachable for ~90 days via direct SHA).
 
 ## Why this file is separate from AGENTS.md
 
