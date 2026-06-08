@@ -37,6 +37,11 @@ concurrency:
 
 jobs:
   mirror:
+    # Defensive: this workflow file gets mirrored *to* breedx along with
+    # the rest of the tree, and would attempt to run there too (and fail,
+    # since BREEDX_DEPLOY_KEY isn't set on breedx). Pin it to the BuddyTV
+    # source-of-truth repo only.
+    if: github.repository == 'BuddyTV/lab-code_puppy'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout BuddyTV ref
