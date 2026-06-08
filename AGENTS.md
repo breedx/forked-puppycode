@@ -3,7 +3,7 @@
 > **Golden rule:** nearly all new functionality should be a **plugin** under `code_puppy/plugins/`
 > that hooks into core via `code_puppy/callbacks.py`. Don't edit `code_puppy/command_line/`.
 
-> **Vizio fork:** branch model, vendoring, and upstream-PR workflow live in
+> **VIZIO fork:** branch model, vendoring, and upstream-PR workflow live in
 > @DEVELOPER.md. This file stays upstream-shaped so merges from
 > `mpfaffenberger/code_puppy` apply cleanly.
 

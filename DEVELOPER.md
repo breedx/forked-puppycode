@@ -1,11 +1,11 @@
-# lab-code_puppy — Developer Guide (Vizio fork)
+# lab-code_puppy — Developer Guide (VIZIO fork)
 
-This file is **Vizio-only**. It is not present in upstream
+This file is **VIZIO-only**. It is not present in upstream
 [`mpfaffenberger/code_puppy`](https://github.com/mpfaffenberger/code_puppy)
 and never will be — keeping our content out of `AGENTS.md` is what makes
 upstream merges conflict-free.
 
-If you came here from `AGENTS.md`'s Vizio-fork pointer: this is the
+If you came here from `AGENTS.md`'s VIZIO-fork pointer: this is the
 right place. If you're looking for the upstream plugin contract, hooks
 table, or core rules, that's still in `AGENTS.md`.
 
@@ -30,12 +30,12 @@ public the moment it merges:
   upstream").
 
 `main` is identical to `mpfaffenberger/main` (already public — zero
-incremental exposure). `forked-main` carries upstream + Vizio
-commits — the danger zone is anything Vizio adds on top.
+incremental exposure). `forked-main` carries upstream + VIZIO
+commits — the danger zone is anything VIZIO adds on top.
 
 ## What is this branch?
 
-`forked-main` on `BuddyTV/lab-code_puppy` is the Vizio downstream of
+`forked-main` on `BuddyTV/lab-code_puppy` is the VIZIO downstream of
 `mpfaffenberger/code_puppy`. Origin lives at **`BuddyTV/lab-code_puppy`**
 (internal repo) — the canonical home, replacing the previous personal
 fork at `breedx/forked-puppycode` (which is now demoted to "public
@@ -49,7 +49,7 @@ directly unless the change should land in production.
 ## Remotes
 
 ```
-origin    git@github.com:BuddyTV/lab-code_puppy.git   # Vizio fork (internal)
+origin    git@github.com:BuddyTV/lab-code_puppy.git   # VIZIO fork (internal)
 upstream  https://github.com/mpfaffenberger/code_puppy.git
 ```
 
@@ -68,15 +68,15 @@ git fetch upstream
 
 ```
 upstream/main ──▶ origin/main ──▶ feature branches ──▶ origin/forked-main
-   (mpf)         (clean mirror)    (off main)         (Vizio fork; ships)
+   (mpf)         (clean mirror)    (off main)         (VIZIO fork; ships)
 ```
 
 - **`main`** — clean mirror of `upstream/main`. Fast-forward only; no
-  Vizio commits ever land here. This is so a feature branch cut off
+  VIZIO commits ever land here. This is so a feature branch cut off
   `main` is a clean diff against upstream and can be PR'd back without
   carrying our local merges.
 - **`forked-main`** — what we actually ship. Periodic `merge
-  upstream/main` brings the upstream firehose in; Vizio-only commits
+  upstream/main` brings the upstream firehose in; VIZIO-only commits
   land here only when they're not appropriate for upstream (e.g. a
   workaround for a deployed-config quirk). **Default branch on
   `BuddyTV/lab-code_puppy` is `forked-main`.**
@@ -110,14 +110,14 @@ gh pr create -R BuddyTV/lab-code_puppy --base forked-main
 ```
 
 The branch is now also PR-ready against upstream — same commit, no
-rebase, no carried Vizio changes. See "Contributing back to upstream"
+rebase, no carried VIZIO changes. See "Contributing back to upstream"
 below for the publish step.
 
 ## Pulling upstream updates
 
 Two flows, two destinations:
 
-**`main`** — fast-forward only, never gets Vizio commits:
+**`main`** — fast-forward only, never gets VIZIO commits:
 
 ```bash
 git checkout main
@@ -165,7 +165,7 @@ gh pr create -R mpfaffenberger/code_puppy \
 ```
 
 Because the branch was cut from `main` (which mirrors upstream), the
-diff is clean — no Vizio commits sneak into the PR. After upstream
+diff is clean — no VIZIO commits sneak into the PR. After upstream
 merges, the change comes back via the standard `git fetch upstream &&
 git merge upstream/main` flow.
 
@@ -181,7 +181,7 @@ or `forked-main` on `BuddyTV/lab-code_puppy` and pushes that ref to
 half on breedx as a write deploy key, private half on BuddyTV as the
 `BREEDX_DEPLOY_KEY` repo secret.
 
-The workflow filename is Vizio-specific so upstream merges never
+The workflow filename is VIZIO-specific so upstream merges never
 conflict on it. Upstream's own workflows (`ci.yml`, `publish.yml`,
 `pypi-downloads.yml`) are **disabled** at the repo-settings level
 (state lives outside git, files are byte-identical to upstream — also
@@ -207,7 +207,7 @@ remember GitHub keeps refs reachable for ~90 days via direct SHA).
 
 `AGENTS.md` is upstream-owned. Every commit upstream makes to it is
 folded in by the next `git fetch upstream && git merge upstream/main`
-on `forked-main`. If we embed Vizio-only content in `AGENTS.md`, every
+on `forked-main`. If we embed VIZIO-only content in `AGENTS.md`, every
 upstream edit risks a merge conflict on our content even when the
 edits are unrelated.
 
@@ -215,8 +215,8 @@ edits are unrelated.
 never participates in upstream merges. Edit freely.
 
 `AGENTS.md` keeps a single line pointing here so a contributor reading
-upstream-shaped docs gets routed to the Vizio specifics:
+upstream-shaped docs gets routed to the VIZIO specifics:
 
 ```
-> **Vizio fork:** see @DEVELOPER.md for branch model and dev workflow.
+> **VIZIO fork:** see @DEVELOPER.md for branch model and dev workflow.
 ```
