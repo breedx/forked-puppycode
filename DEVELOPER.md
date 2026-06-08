@@ -1,37 +1,55 @@
 # lab-code_puppy — Developer Guide (VIZIO fork)
 
-This file is **VIZIO-only**. It is not present in upstream
-[`mpfaffenberger/code_puppy`](https://github.com/mpfaffenberger/code_puppy)
-and never will be — keeping our content out of `AGENTS.md` is what makes
+## ⚠️ Treat this repo as public. No secrets, ever.
+
+Every push to `main` or `forked-main` on `BuddyTV/lab-code_puppy`
+auto-mirrors to **`breedx/forked-puppycode`, which is on the public
+internet**. Anything you commit to those two branches is public from
+that moment on — there is no "delete and it goes away," GitHub keeps
+refs reachable by SHA for ~90 days even after you force-push.
+
+**Never commit:**
+
+- API keys, tokens, passwords, JWTs, signing keys, deploy keys
+- AWS / Azure / GCP credentials (in code, in tests, in fixtures)
+- `.env` files, `puppy.cfg` with real values, anything from `~/.lab/`
+- Internal hostnames (`*.vizio.com`, `*.vizio-rad.com`, etc.)
+- Internal URLs, Slack permalinks, Jira tickets with sensitive titles,
+  paste-bin output, screenshots from internal tools
+- Customer names, employee names, IP addresses from internal networks
+- Output of internal API calls (responses, logs, traces)
+
+**If you commit a secret, assume it's compromised.** Rotate it
+immediately at the source (regenerate the AWS key, mint a new JWT,
+etc.). Don't try to scrub history first — that takes hours and the
+secret is already in someone's clone or GitHub's CDN.
+
+**Topic branches are not mirrored** — they stay internal on BuddyTV
+unless you explicitly `git push breedx <branch>` (see
+"Contributing back to upstream"). Use a topic branch for anything
+sensitive while you sort it out.
+
+## Repos at a glance
+
+| Repo | Visibility | Role | Auto-mirrored |
+|---|---|---|---|
+| [`BuddyTV/lab-code_puppy`](https://github.com/BuddyTV/lab-code_puppy) | **internal** | Source of truth. Default branch `forked-main`. | n/a — origin |
+| [`mpfaffenberger/code_puppy`](https://github.com/mpfaffenberger/code_puppy) | **public** | Upstream maintainer's repo. Pull only; never push. | n/a |
+| [`breedx/forked-puppycode`](https://github.com/breedx/forked-puppycode) | **public** | PR-staging surface for upstream contributions. | `main` and `forked-main` (every push) |
+
+`main` is byte-identical to `mpfaffenberger/main` — mirroring it
+exposes nothing new. `forked-main` carries upstream + VIZIO commits —
+that's the surface where leaks happen. Review every commit going in.
+
+## What this file is
+
+VIZIO-only. Not present in upstream `mpfaffenberger/code_puppy` and
+never will be — keeping our content out of `AGENTS.md` is what makes
 upstream merges conflict-free.
 
 If you came here from `AGENTS.md`'s VIZIO-fork pointer: this is the
 right place. If you're looking for the upstream plugin contract, hooks
 table, or core rules, that's still in `AGENTS.md`.
-
-## Repos at a glance — read this before pushing anything
-
-| Repo | Visibility | Role | What's mirrored |
-|---|---|---|---|
-| [`BuddyTV/lab-code_puppy`](https://github.com/BuddyTV/lab-code_puppy) | **internal** | Source of truth. Where you do daily work. Default branch `forked-main`. | n/a |
-| [`mpfaffenberger/code_puppy`](https://github.com/mpfaffenberger/code_puppy) | **public** | Upstream maintainer's repo. We pull from it; we never push. | n/a |
-| [`breedx/forked-puppycode`](https://github.com/breedx/forked-puppycode) | **public** ⚠️ | Public mirror used as a PR-staging surface against upstream. | `main` and `forked-main` (auto, every push) |
-
-⚠️ **`breedx/forked-puppycode` is on the public internet.** Every push
-to `BuddyTV/lab-code_puppy`'s `main` or `forked-main` is automatically
-mirrored there. Treat anything you commit to those two branches as
-public the moment it merges:
-
-- No internal hostnames in commit messages or code comments.
-- No internal URLs / Slack permalinks / paste-bin output in code.
-- No customer / employee data anywhere.
-- Topic branches are NOT mirrored — they stay on BuddyTV unless you
-  explicitly `git push breedx <branch>` (see "Contributing back to
-  upstream").
-
-`main` is identical to `mpfaffenberger/main` (already public — zero
-incremental exposure). `forked-main` carries upstream + VIZIO
-commits — the danger zone is anything VIZIO adds on top.
 
 ## What is this branch?
 
