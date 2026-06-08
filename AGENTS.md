@@ -59,3 +59,70 @@ Full list + rarely-used hooks: see `code_puppy/callbacks.py` source.
 5. **Return `None` from commands you don't own**
 6. **Always run linters - `ruff check --fix`, `ruff format .`
 7. **NEVER ALLOW A CLAUDE CO-AUTHOR COMMIT**
+
+## Vizio fork (BuddyTV/lab-code_puppy)
+
+This branch (`forked-main`) is the Vizio downstream of
+[`mpfaffenberger/code_puppy`](https://github.com/mpfaffenberger/code_puppy).
+Origin lives at **`BuddyTV/lab-code_puppy`** (internal repo) — that's
+the canonical home, replacing the previous personal fork at
+`breedx/forked-puppycode`. The upstream maintainer's repo is unchanged.
+
+The wheel built from `forked-main` is vendored into
+[`lab-pack`](https://github.com/BuddyTV/lab-pack) via `make vendor-puppy`
+and shipped to users as part of the lab stack. Don't edit `forked-main`
+unless the change should land in production.
+
+### Remotes
+
+```
+origin    git@github.com:BuddyTV/lab-code_puppy.git   # Vizio fork (internal)
+upstream  https://github.com/mpfaffenberger/code_puppy.git
+```
+
+`upstream` is required for `make vendor-puppy` (which runs `git fetch
+upstream && git merge upstream/main` from `lab-pack/Makefile`). Set it
+on first clone:
+
+```bash
+git clone git@github.com:BuddyTV/lab-code_puppy.git puppy-code
+cd puppy-code
+git remote add upstream https://github.com/mpfaffenberger/code_puppy.git
+git fetch upstream
+```
+
+### Pulling upstream updates
+
+`forked-main` tracks upstream. Periodic merges keep us close to head:
+
+```bash
+git checkout forked-main
+git fetch upstream
+git merge upstream/main
+git push origin forked-main
+```
+
+`make vendor-puppy` in `lab-pack` does this same sequence then rebuilds
+the wheel and bumps the pin in `lab-pack/pyproject.toml`. Use the make
+target when shipping a new pack; the manual sequence above is for
+when you only want to pick up upstream without cutting a release.
+
+### Contributing back to upstream
+
+`BuddyTV/lab-code_puppy` is **internal-only** — github.com won't accept
+its branches as PR head refs against the public upstream. To submit a
+fix back:
+
+1. Push the topic branch to a public personal fork of upstream as well:
+   ```bash
+   git remote add publish git@github.com:<your-user>/forked-puppycode.git
+   git push publish fix/<branch>
+   ```
+2. Open the PR from there:
+   ```bash
+   gh pr create -R mpfaffenberger/code_puppy \
+       --head <your-user>:fix/<branch> --base main
+   ```
+
+The internal repo stays the source of truth; the personal clone is a
+publish-only mirror for the head ref.
