@@ -1,0 +1,56 @@
+# Mirror BuddyTV/lab-code_puppy → breedx/forked-puppycode
+#
+# Vizio-only workflow. Pushes `main` and `forked-main` to the public personal
+# fork so they can serve as PR head refs against mpfaffenberger/code_puppy.
+#
+# This filename is Vizio-specific; upstream will never collide on it. The
+# upstream-owned workflows (ci.yml, publish.yml, pypi-downloads.yml) are
+# disabled via `gh workflow disable` in this repo — the file content stays
+# upstream-identical so `git merge upstream/main` never conflicts.
+#
+# Auth: BREEDX_DEPLOY_KEY (private half of an ed25519 pair). Public half is
+# installed on breedx/forked-puppycode as a write deploy key. Rotate by
+# regenerating the pair: replace the deploy key on breedx, replace the
+# secret here.
+
+name: Mirror to breedx fork
+
+on:
+  push:
+    branches:
+      - forked-main
+      - main
+
+concurrency:
+  group: mirror-breedx
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout BuddyTV ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Configure SSH for breedx
+        env:
+          BREEDX_DEPLOY_KEY: ${{ secrets.BREEDX_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$BREEDX_DEPLOY_KEY" > ~/.ssh/breedx_key
+          chmod 600 ~/.ssh/breedx_key
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Push ref to breedx
+        env:
+          GIT_SSH_COMMAND: "ssh -i ~/.ssh/breedx_key -o IdentitiesOnly=yes"
+        run: |
+          set -euo pipefail
+          REF_NAME="${GITHUB_REF#refs/heads/}"
+          echo "Mirroring $REF_NAME to breedx/forked-puppycode"
+          git remote add breedx git@github.com:breedx/forked-puppycode.git
+          git push breedx "HEAD:refs/heads/$REF_NAME"

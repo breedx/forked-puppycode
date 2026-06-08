@@ -9,13 +9,37 @@ If you came here from `AGENTS.md`'s Vizio-fork pointer: this is the
 right place. If you're looking for the upstream plugin contract, hooks
 table, or core rules, that's still in `AGENTS.md`.
 
+## Repos at a glance — read this before pushing anything
+
+| Repo | Visibility | Role | What's mirrored |
+|---|---|---|---|
+| [`BuddyTV/lab-code_puppy`](https://github.com/BuddyTV/lab-code_puppy) | **internal** | Source of truth. Where you do daily work. Default branch `forked-main`. | n/a |
+| [`mpfaffenberger/code_puppy`](https://github.com/mpfaffenberger/code_puppy) | **public** | Upstream maintainer's repo. We pull from it; we never push. | n/a |
+| [`breedx/forked-puppycode`](https://github.com/breedx/forked-puppycode) | **public** ⚠️ | Public mirror used as a PR-staging surface against upstream. | `main` and `forked-main` (auto, every push) |
+
+⚠️ **`breedx/forked-puppycode` is on the public internet.** Every push
+to `BuddyTV/lab-code_puppy`'s `main` or `forked-main` is automatically
+mirrored there. Treat anything you commit to those two branches as
+public the moment it merges:
+
+- No internal hostnames in commit messages or code comments.
+- No internal URLs / Slack permalinks / paste-bin output in code.
+- No customer / employee data anywhere.
+- Topic branches are NOT mirrored — they stay on BuddyTV unless you
+  explicitly `git push breedx <branch>` (see "Contributing back to
+  upstream").
+
+`main` is identical to `mpfaffenberger/main` (already public — zero
+incremental exposure). `forked-main` carries upstream + Vizio
+commits — the danger zone is anything Vizio adds on top.
+
 ## What is this branch?
 
 `forked-main` on `BuddyTV/lab-code_puppy` is the Vizio downstream of
 `mpfaffenberger/code_puppy`. Origin lives at **`BuddyTV/lab-code_puppy`**
 (internal repo) — the canonical home, replacing the previous personal
-fork at `breedx/forked-puppycode`. The upstream maintainer's repo is
-unchanged.
+fork at `breedx/forked-puppycode` (which is now demoted to "public
+mirror used as a PR-staging surface", per the table above).
 
 The wheel built from `forked-main` is vendored into
 [`lab-pack`](https://github.com/BuddyTV/lab-pack) via `make vendor-puppy`
@@ -121,35 +145,63 @@ when you only want to pick up upstream without cutting a release.
 
 ## Contributing back to upstream
 
-`BuddyTV/lab-code_puppy` is **internal-only** — github.com won't accept
-its branches as PR head refs against the public upstream. The branch
-needs to live on a public repo that GitHub considers a fork of
-`mpfaffenberger/code_puppy`.
+`BuddyTV/lab-code_puppy` is internal-only — github.com won't accept its
+branches as PR head refs against the public upstream. We use
+`breedx/forked-puppycode` as a public PR-staging surface.
 
-One-time setup — fork `mpfaffenberger/code_puppy` into your personal
-GitHub account via the github.com UI, then add it as a remote:
-
-```bash
-git remote add publish git@github.com:<your-user>/code_puppy.git
-```
-
-Per-PR — push the same topic branch you used internally:
+`main` and `forked-main` mirror automatically (see "Mirror automation"
+below). For topic branches you want to send upstream, push them
+manually:
 
 ```bash
-git push publish fix/mcp-tool-error-handling
+# One-time: add breedx as a remote.
+git remote add breedx git@github.com:breedx/forked-puppycode.git
+
+# Per-PR: push your topic branch to breedx, then PR upstream.
+git push breedx fix/mcp-tool-error-handling
 gh pr create -R mpfaffenberger/code_puppy \
-    --head <your-user>:fix/mcp-tool-error-handling \
+    --head breedx:fix/mcp-tool-error-handling \
     --base main
 ```
 
 Because the branch was cut from `main` (which mirrors upstream), the
-diff is clean — no Vizio commits sneak into the PR. The internal repo
-stays the source of truth; the personal clone is a publish-only mirror
-for the head ref.
+diff is clean — no Vizio commits sneak into the PR. After upstream
+merges, the change comes back via the standard `git fetch upstream &&
+git merge upstream/main` flow.
 
-After upstream merges, the change comes back to us via the standard
-`git fetch upstream && git merge upstream/main` flow on `main` and
-`forked-main` — no special handling.
+Manually-pushed topic branches stay on `breedx` until you delete them
+(`git push breedx --delete <branch>`). The mirror automation only
+manages `main` and `forked-main`; nothing GCs topic branches for you.
+
+## Mirror automation
+
+`.github/workflows/mirror-vizio-fork.yml` runs on every push to `main`
+or `forked-main` on `BuddyTV/lab-code_puppy` and pushes that ref to
+`breedx/forked-puppycode`. Auth is an ed25519 deploy keypair: public
+half on breedx as a write deploy key, private half on BuddyTV as the
+`BREEDX_DEPLOY_KEY` repo secret.
+
+The workflow filename is Vizio-specific so upstream merges never
+conflict on it. Upstream's own workflows (`ci.yml`, `publish.yml`,
+`pypi-downloads.yml`) are **disabled** at the repo-settings level
+(state lives outside git, files are byte-identical to upstream — also
+conflict-free).
+
+Rotation — generate a new ed25519 pair, replace the deploy key on
+`breedx/forked-puppycode`, set the new private half as
+`BREEDX_DEPLOY_KEY` on `BuddyTV/lab-code_puppy`. The old key stops
+working the moment the deploy key is removed.
+
+To disable the mirror entirely:
+
+```bash
+gh workflow disable "Mirror to breedx fork" -R BuddyTV/lab-code_puppy
+```
+
+⚠️ Disabling the mirror does NOT scrub history that's already public on
+breedx. If something internal leaks through `forked-main`, deal with
+it on breedx itself (delete branch + force-push if you must, but
+remember GitHub keeps refs reachable for ~90 days via direct SHA).
 
 ## Why this file is separate from AGENTS.md
 
