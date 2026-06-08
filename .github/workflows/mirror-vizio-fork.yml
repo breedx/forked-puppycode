@@ -20,6 +20,11 @@ on:
     branches:
       - forked-main
       - main
+  workflow_dispatch:
+    # Manual trigger — for re-sync after a push happened before this
+    # workflow existed, or after rotating BREEDX_DEPLOY_KEY. Run with:
+    #   gh workflow run "Mirror to breedx fork" -R BuddyTV/lab-code_puppy --ref <main|forked-main>
+    # The workflow runs on the ref selected and mirrors that ref to breedx.
 
 concurrency:
   group: mirror-breedx
