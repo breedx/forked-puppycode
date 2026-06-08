@@ -82,9 +82,14 @@ class AsyncServerLifecycleManager:
                 name=f"mcp_server_{server_id}",
             )
 
-        # Release the lock while waiting for the server to become ready
+        # Release the lock while waiting for the server to become ready.
+        # 30s covers the slow-cold-start cases (npx -y first-run install,
+        # puppeteer launching Chromium, uvx-style fetches) without making
+        # an interactive freeze feel like a permanent hang. Past 30s the
+        # user has typically given up and Ctrl+C'd anyway; better to
+        # surface the "didn't start, run /mcp logs" hint sooner.
         try:
-            await asyncio.wait_for(ready_event.wait(), timeout=10.0)
+            await asyncio.wait_for(ready_event.wait(), timeout=30.0)
         except asyncio.TimeoutError:
             logger.error(f"Timed out waiting for server {server_id} to start")
             if task.done():
@@ -250,14 +255,18 @@ class AsyncServerLifecycleManager:
 
         context = self._servers[server_id]
 
-        # Cancel the lifecycle task
-        # This will cause the task to exit and clean up properly
+        # Cancel the lifecycle task and wait for it to drain.
+        # Bounded — if a server's cleanup blocks (subprocess stuck,
+        # exit_stack.aclose() hanging on a pipe), we'd otherwise sit
+        # here forever and the parent process can never exit. 5s is
+        # well above any sane MCP cleanup; past that, we give up and
+        # let the OS reap the subprocess on parent exit.
         context.task.cancel()
 
         try:
-            await context.task
-        except asyncio.CancelledError:
-            pass  # Expected
+            await asyncio.wait_for(asyncio.shield(context.task), timeout=5.0)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            pass  # CancelledError is the normal path; TimeoutError = stuck cleanup.
 
         logger.info(f"Stopped server {server_id}")
         return True

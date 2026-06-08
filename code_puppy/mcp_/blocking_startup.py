@@ -259,11 +259,20 @@ class BlockingMCPServerStdio(SimpleCapturedMCPServerStdio):
 
             self._initialized.set()
 
+            server_name = getattr(self, "tool_prefix", self.command)
+
+            # Persist the error so `/mcp logs <name>` actually has
+            # something to show. Without this, the hint below sends
+            # the user to an empty log file — the error string is
+            # already on `self._init_error` but only stays in process
+            # memory and is lost the next time the manager respawns.
+            write_log(server_name, f"ERROR: {error_details}", "ERROR")
+
             # Gentle one-liner pointing the user to /mcp logs for details.
             # The full error_details are intentionally NOT included here —
-            # they're already in the persistent log file. We don't want to
-            # spam the prompt with stack traces every time the agent runs.
-            server_name = getattr(self, "tool_prefix", self.command)
+            # they're now in the persistent log file (above). We don't
+            # want to spam the prompt with stack traces every time the
+            # agent runs.
             emit_info(
                 f"⚠  MCP server '{server_name}' didn't start. "
                 f"Run [cyan]/mcp logs {server_name}[/cyan] to investigate, "

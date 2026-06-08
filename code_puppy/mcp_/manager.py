@@ -150,6 +150,21 @@ class MCPManager:
 
         logger.info("MCPManager initialized with core components")
 
+        # Drain MCP lifecycle tasks on app shutdown. Without this, stdio
+        # subprocesses linger after pup exits — the user sees the prompt
+        # return but background `npx`/`uvx` processes keep their stdio
+        # pipes open until the OS reaps them. The shutdown hook calls
+        # stop_all() which iterates servers and cancels each lifecycle
+        # task with a bounded wait (see async_lifecycle.stop_server).
+        from code_puppy.callbacks import register_callback
+
+        async def _shutdown_mcp() -> None:
+            from code_puppy.mcp_.async_lifecycle import get_lifecycle_manager
+
+            await get_lifecycle_manager().stop_all()
+
+        register_callback("shutdown", _shutdown_mcp)
+
     def sync_from_config(self) -> None:
         """Sync servers from mcp_servers.json into the registry.
 
