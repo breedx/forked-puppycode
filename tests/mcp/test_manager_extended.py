@@ -50,6 +50,29 @@ class TestMCPManagerExtended:
         assert isinstance(mgr2, MCPManager)
         assert isinstance(mgr3, MCPManager)
 
+    def test_shutdown_callback_registered_once_across_instances(self):
+        """The shutdown hook must dedup no matter how many managers are built.
+
+        Regression test: _shutdown_mcp is a module-level function so
+        register_callback's identity-based dedup catches it. A per-instance
+        closure (the prior bug) registered a fresh function each time, so
+        constructing N managers stacked N shutdown callbacks — and each one
+        runs stop_all() on exit.
+        """
+        from code_puppy.callbacks import _callbacks
+        from code_puppy.mcp_.manager import _shutdown_mcp
+
+        # Start from a clean shutdown phase so the count is unambiguous.
+        _callbacks["shutdown"] = [
+            cb for cb in _callbacks["shutdown"] if cb is not _shutdown_mcp
+        ]
+
+        for _ in range(5):
+            MCPManager()
+
+        registered = [cb for cb in _callbacks["shutdown"] if cb is _shutdown_mcp]
+        assert len(registered) == 1
+
     def test_register_server_success(self):
         """Test successful server registration."""
         manager = MCPManager()

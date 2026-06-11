@@ -421,12 +421,12 @@ class TestAsyncServerLifecycleManagerStopServer:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_stop_server_internal_called_with_lock(self):
-        """Test that stop_server uses the lock correctly."""
+    async def test_stop_server_cancels_task(self):
+        """stop_server cancels the lifecycle task and reports success."""
         manager = AsyncServerLifecycleManager()
         server = AsyncMock()
 
-        # Create a fake context
+        # Create a fake context with a long-running task.
         exit_stack = AsyncExitStack()
         task = asyncio.create_task(asyncio.sleep(100))
         manager._servers["test-server"] = ManagedServerContext(
@@ -437,12 +437,48 @@ class TestAsyncServerLifecycleManagerStopServer:
             task=task,
         )
 
-        with patch.object(
-            manager, "_stop_server_internal", new_callable=AsyncMock
-        ) as mock_internal:
-            mock_internal.return_value = True
-            await manager.stop_server("test-server")
-            mock_internal.assert_called_once_with("test-server")
+        result = await manager.stop_server("test-server")
+
+        assert result is True
+        assert task.cancelled()
+
+    @pytest.mark.asyncio
+    async def test_stop_server_does_not_deadlock_on_lock(self):
+        """A healthy stop must NOT block until the 5s timeout.
+
+        Regression test: stop_server must release self._lock before awaiting
+        the lifecycle task to drain, because the task's finally needs that
+        same lock to deregister itself. Holding the lock across the drain
+        deadlocks and only completes via the timeout path.
+        """
+        manager = AsyncServerLifecycleManager()
+        server = AsyncMock()
+        exit_stack = AsyncExitStack()
+
+        # A realistic lifecycle task: on cancel, its finally takes self._lock
+        # to deregister, exactly like _server_lifecycle_task does.
+        async def fake_lifecycle():
+            try:
+                await asyncio.sleep(100)
+            finally:
+                async with manager._lock:
+                    manager._servers.pop("test-server", None)
+
+        task = asyncio.create_task(fake_lifecycle())
+        await asyncio.sleep(0)  # let the task start
+        manager._servers["test-server"] = ManagedServerContext(
+            server_id="test-server",
+            server=server,
+            exit_stack=exit_stack,
+            start_time=datetime.now(),
+            task=task,
+        )
+
+        # If the lock were held across the drain this would take ~5s.
+        result = await asyncio.wait_for(manager.stop_server("test-server"), timeout=2.0)
+
+        assert result is True
+        assert "test-server" not in manager._servers
 
 
 class TestAsyncServerLifecycleManagerStopAll:

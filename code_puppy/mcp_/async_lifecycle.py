@@ -60,19 +60,25 @@ class AsyncServerLifecycleManager:
         Returns:
             True if server started successfully, False otherwise
         """
+        # Check if already running. If a stale (registered-but-stopped)
+        # context exists, tear it down before spawning a new one. We cancel
+        # under the lock but drain the old task outside it — see stop_server
+        # for why holding the lock across the drain would deadlock.
+        stale_task: Optional[asyncio.Task] = None
         async with self._lock:
-            # Check if already running
             if server_id in self._servers:
                 if self._servers[server_id].server.is_running:
                     logger.info(f"Server {server_id} is already running")
                     return True
                 else:
-                    # Server exists but not running, clean it up
                     logger.warning(
                         f"Server {server_id} exists but not running, cleaning up"
                     )
-                    await self._stop_server_internal(server_id)
+                    stale_task = self._cancel_server_locked(server_id)
+        if stale_task is not None:
+            await self._drain_cancelled_task(server_id, stale_task)
 
+        async with self._lock:
             # Create an event so we know when the server is actually registered
             ready_event = asyncio.Event()
 
@@ -242,31 +248,68 @@ class AsyncServerLifecycleManager:
         Returns:
             True if server was stopped, False if not found
         """
+        # Cancel under the lock (it guards self._servers), but drain the task
+        # OUTSIDE the lock. The lifecycle task's finally needs self._lock to
+        # deregister itself (the `async with self._lock` near the end of
+        # _server_lifecycle_task). If we held the lock while awaiting the
+        # task, that finally could never acquire it and every healthy stop
+        # would block until the 5s timeout fired. Cancel-then-drain-unlocked
+        # makes a clean stop return in ~0s.
         async with self._lock:
-            return await self._stop_server_internal(server_id)
+            task = self._cancel_server_locked(server_id)
+        if task is None:
+            return False
+        return await self._drain_cancelled_task(server_id, task)
 
-    async def _stop_server_internal(self, server_id: str) -> bool:
+    def _cancel_server_locked(self, server_id: str) -> Optional[asyncio.Task]:
         """
-        Internal method to stop a server (must be called with lock held).
+        Cancel a server's lifecycle task. MUST be called with self._lock held.
+
+        Returns the cancelled task (to be drained outside the lock), or None
+        if the server isn't known.
         """
         if server_id not in self._servers:
             logger.warning(f"Server {server_id} not found")
-            return False
+            return None
 
-        context = self._servers[server_id]
+        task = self._servers[server_id].task
+        task.cancel()
+        return task
 
-        # Cancel the lifecycle task and wait for it to drain.
-        # Bounded — if a server's cleanup blocks (subprocess stuck,
-        # exit_stack.aclose() hanging on a pipe), we'd otherwise sit
-        # here forever and the parent process can never exit. 5s is
-        # well above any sane MCP cleanup; past that, we give up and
-        # let the OS reap the subprocess on parent exit.
-        context.task.cancel()
+    async def _drain_cancelled_task(self, server_id: str, task: asyncio.Task) -> bool:
+        """
+        Wait for an already-cancelled lifecycle task to drain.
 
+        MUST NOT be called with self._lock held — the task's finally block
+        needs that lock to deregister itself.
+
+        Bounded — if a server's cleanup blocks (subprocess stuck,
+        exit_stack.aclose() hanging on a pipe), we'd otherwise sit here
+        forever and the parent process could never exit. 5s is well above
+        any sane MCP cleanup; past that we give up and let the OS reap the
+        subprocess on parent exit.
+
+        The asyncio.shield is load-bearing, not vestigial: on timeout,
+        wait_for cancels the awaitable it's given and then waits for that
+        cancellation to complete. If we passed the bare task and its cleanup
+        is genuinely stuck (the exact case this bound exists for), wait_for
+        would block PAST 5s waiting for the un-cancellable task to finish
+        unwinding — defeating the bound. Shielding makes wait_for cancel a
+        throwaway wrapper instead, so the 5s is a true ceiling and the real
+        task keeps draining detached.
+        """
         try:
-            await asyncio.wait_for(asyncio.shield(context.task), timeout=5.0)
-        except (asyncio.CancelledError, asyncio.TimeoutError):
-            pass  # CancelledError is the normal path; TimeoutError = stuck cleanup.
+            await asyncio.wait_for(asyncio.shield(task), timeout=5.0)
+        except asyncio.CancelledError:
+            pass  # The normal path: the task observed the cancel and unwound.
+        except asyncio.TimeoutError:
+            # Cleanup is genuinely stuck. The task keeps running detached;
+            # don't claim a clean stop.
+            logger.warning(
+                f"Server {server_id} did not drain within 5s; giving up and "
+                f"letting the OS reap the subprocess on parent exit"
+            )
+            return False
 
         logger.info(f"Stopped server {server_id}")
         return True

@@ -266,7 +266,15 @@ class BlockingMCPServerStdio(SimpleCapturedMCPServerStdio):
             # the user to an empty log file — the error string is
             # already on `self._init_error` but only stays in process
             # memory and is lost the next time the manager respawns.
-            write_log(server_name, f"ERROR: {error_details}", "ERROR")
+            #
+            # Best-effort: this runs in the startup exception handler, so a
+            # logging failure (bad permissions, disk full) must not mask the
+            # original MCP startup error or swallow the user-facing hint
+            # below. The level arg already encodes ERROR — no text prefix.
+            try:
+                write_log(server_name, error_details, "ERROR")
+            except Exception:
+                pass
 
             # Gentle one-liner pointing the user to /mcp logs for details.
             # The full error_details are intentionally NOT included here —

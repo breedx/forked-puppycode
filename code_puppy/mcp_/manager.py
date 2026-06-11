@@ -33,6 +33,16 @@ logger = logging.getLogger(__name__)
 _WARNED_UNBOUND: set = set()
 
 
+async def _shutdown_mcp() -> None:
+    """Drain all MCP lifecycle tasks on app shutdown.
+
+    Module-level (not a per-instance closure) so register_callback's
+    identity-based dedup works — MCPManager is constructed in more than one
+    place, and a fresh closure per instance would stack duplicate callbacks.
+    """
+    await get_lifecycle_manager().stop_all()
+
+
 def _warn_unbound_servers(server_names: List[str], agent_name: str) -> None:
     """Warn once, in a single consolidated block, about registered-but-unbound MCP servers.
 
@@ -156,12 +166,13 @@ class MCPManager:
         # pipes open until the OS reaps them. The shutdown hook calls
         # stop_all() which iterates servers and cancels each lifecycle
         # task with a bounded wait (see async_lifecycle.stop_server).
+        #
+        # _shutdown_mcp is a module-level function, NOT a per-instance
+        # closure: register_callback dedups by function identity, and
+        # MCPManager isn't a guaranteed singleton (tab-completion and other
+        # call sites construct bare instances). A fresh closure per __init__
+        # would defeat the dedup and stack N shutdown callbacks.
         from code_puppy.callbacks import register_callback
-
-        async def _shutdown_mcp() -> None:
-            from code_puppy.mcp_.async_lifecycle import get_lifecycle_manager
-
-            await get_lifecycle_manager().stop_all()
 
         register_callback("shutdown", _shutdown_mcp)
 
